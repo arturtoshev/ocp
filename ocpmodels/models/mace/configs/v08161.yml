@@ -1,0 +1,68 @@
+trainer: forces
+
+logger: wandb
+
+task:
+  dataset: trajectory_lmdb
+  description: "Regressing to energies and forces for DFT trajectories from OCP"
+  type: regression
+  metric: mae
+  primary_metric: forces_mae
+  labels:
+    - potential energy
+  grad_input: atomic forces
+  train_on_free_atoms: True
+  eval_on_free_atoms: True
+
+dataset:
+  - src: /checkpoint/electrocatalysis/relaxations/features/struct_to_energy_forces/train/2M/
+    normalize_labels: True
+    target_mean: -0.7554450631141663
+    target_std: 2.887317180633545
+    grad_target_mean: 0.0
+    grad_target_std: 2.887317180633545
+  - src: /checkpoint/electrocatalysis/relaxations/features/struct_to_energy_forces/val/id_30k/
+
+model:
+  name: mace_v8.16.1
+  # Copied from https://github.com/ACEsuit/mace#training.
+  r_max: 6.0 # was originally 5.0
+  # Use `avg_num_neighbors` = 50 if r_max is 12.0, 35 if r_max is 6.0.
+  # This is because max_neighbors is set to 50. At r_max = 12, we get all nbrs.
+  avg_num_neighbors: 35
+  num_bessel: 8
+  num_polynomial_cutoff: 5
+  max_ell: 3
+  num_interactions: 2
+  num_elements: 83
+  hidden_irreps: 128x0e + 128x1o
+  MLP_irreps: 16x0e
+  # atomic_energies: ref energy per atomic number.
+  correlation: 3
+  normalize_distance_vec: false
+  correct_cell_offsets: true
+
+optim:
+  batch_size: 32
+  eval_batch_size: 32
+  load_balancing: atoms
+  eval_every: 1000
+  num_workers: 2
+  lr_initial: 5.e-4
+  optimizer: AdamW
+  optimizer_params: {"amsgrad": True}
+  scheduler: ReduceLROnPlateau
+  mode: min
+  factor: 0.8
+  patience: 3
+  max_epochs: 80
+  force_coefficient: 100
+  energy_coefficient: 1
+  ema_decay: 0.999
+  clip_grad_norm: 10
+  loss_energy: mae
+  loss_force: l2mae
+  weight_decay: 0  # 2e-6 (TF weight decay) / 1e-4 (lr) = 2e-2
+
+slurm:
+  constraint: "volta32gb"
