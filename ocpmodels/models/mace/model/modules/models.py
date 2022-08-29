@@ -1,3 +1,9 @@
+###########################################################################################
+# Implementation of MACE models and other models based E(3)-Equivariant MPNNs
+# Authors: Ilyes Batatia, Gregor Simm
+# This program is distributed under the ASL License (see ASL.md)
+###########################################################################################
+
 from typing import Any, Callable, Dict, List, Optional, Type
 
 import numpy as np

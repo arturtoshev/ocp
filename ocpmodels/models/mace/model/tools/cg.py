@@ -1,3 +1,9 @@
+###########################################################################################
+# Higher Order Real Clebsch Gordan (based on e3nn by Mario Geiger)
+# Authors: Ilyes Batatia
+# This program is distributed under the ASL License (see ASL.md)
+###########################################################################################
+
 import collections
 from typing import List, Union
 

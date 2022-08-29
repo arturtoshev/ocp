@@ -1,3 +1,9 @@
+###########################################################################################
+# Elementary Block for Building O(3) Equivariant Higher Order Message Passing Neural Network
+# Authors: Ilyes Batatia, Gregor Simm
+# This program is distributed under the ASL License (see ASL.md)
+###########################################################################################
+
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Optional, Tuple, Union
 

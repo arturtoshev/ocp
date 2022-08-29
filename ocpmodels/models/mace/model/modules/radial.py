@@ -1,3 +1,9 @@
+###########################################################################################
+# Radial basis and cutoff
+# Authors: Ilyes Batatia, Gregor Simm
+# This program is distributed under the ASL License (see ASL.md)
+###########################################################################################
+
 import numpy as np
 import torch
 
