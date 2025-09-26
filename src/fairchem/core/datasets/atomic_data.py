@@ -141,6 +141,9 @@ class AtomicData:
         batch: torch.Tensor | None = None,  # (num_node,)
         sid: list[str] | None = None,
         dataset: list[str] | str | None = None,
+        T: Optional[torch.Tensor] = None,  # (num_graph,) temperature
+        P: Optional[torch.Tensor] = None,  # (num_graph,) pressure
+        V: Optional[torch.Tensor] = None,  # (num_graph,) volume
     ):
         self.__keys__ = set(_REQUIRED_KEYS)
 
@@ -159,6 +162,9 @@ class AtomicData:
         self.fixed = fixed
         self.tags = tags
         self.sid = sid if sid is not None else [""]
+        self.T = T
+        self.P = P
+        self.V = V
 
         if dataset is not None:
             self.dataset = dataset
@@ -513,6 +519,9 @@ class AtomicData:
             batch=dictionary.get("batch", None),
             sid=dictionary.get("sid", None),
             dataset=dictionary.get("dataset", None),
+            T=dictionary.get("T", None),
+            P=dictionary.get("P", None),
+            V=dictionary.get("V", None),
         )
 
         # TODO: may require validation for them in the future
@@ -787,6 +796,27 @@ class AtomicData:
         order to be able to reconstruct the initial objects."""
         return [self.get_example(i) for i in range(self.num_graphs)]
 
+    def update_batch_edges(
+        self, edge_index: torch.Tensor, cell_offsets: torch.Tensor, nedges: torch.Tensor
+    ) -> AtomicData:
+        r"""Update the connectivity of each batched AtomicData sample.
+
+        Args:
+            edge_index (torch.Tensor): New batch edge_index (shape [2, total_edges]).
+            cell_offsets (torch.Tensor): Cell offsets per edge (shape [total_edges, 3]).
+            nedges (torch.Tensor): Number of edges per system (shape [num_systems]).
+
+        Returns:
+            AtomicData: The updated batch object.
+        """
+        self.edge_index = edge_index
+        self.cell_offsets = cell_offsets
+        self.nedges = nedges
+        edge_slices = [0] + torch.cumsum(nedges, dim=0).tolist()
+        self.__slices__["edge_index"] = edge_slices
+        self.__slices__["cell_offsets"] = edge_slices
+        return self
+
 
 def atomicdata_list_to_batch(
     data_list: list[AtomicData], exclude_keys: Optional[list] = None
@@ -799,7 +829,7 @@ def atomicdata_list_to_batch(
     # arbitrary set of keys handled at set_item?
     if exclude_keys is None:
         exclude_keys = []
-    keys = list(set(data_list[0].keys()))
+    keys = list(set(data_list[0].keys()) - set(exclude_keys))
 
     batched_data_dict = {k: [] for k in keys}
     batch = []
@@ -886,3 +916,25 @@ def tensor_or_int_to_tensor(x, dtype=torch.int):
         assert x.dtype == dtype, "Tensor is not of right dtype"
         return x
     raise ValueError(f"type({x}) is not an int or tensor")
+
+
+if __name__ == "__main__":
+    from ocp.src.fairchem.core.graph.radius_graph_pbc import radius_graph_pbc_v2
+
+    ase_atoms = ase.Atoms(positions=[[0.5, 0, 0], [1, 0, 0]], cell=(2, 2, 2), pbc=True)
+    atomicdata_list_edgeless = [AtomicData.from_ase(ase_atoms) for _ in range(2)]
+    batch = atomicdata_list_to_batch(atomicdata_list_edgeless)
+    edge_index, cell_offsets, neighbors = radius_graph_pbc_v2(
+        batch,
+        radius=1,
+        max_num_neighbors_threshold=100,
+        pbc=batch["pbc"][0],  # use the PBC from molecule 0
+    )
+    batch.update_batch_edges(edge_index, cell_offsets, neighbors)
+
+    ### Add T, P, V attributes
+    batch.T = torch.tensor([300.0, 350.0])  # Temperature
+    batch.P = torch.tensor([1.0, 2.0])      # Pressure
+    batch.V = torch.tensor([10.0, 20.0])    # Volume
+    atomicdata_list = batch.batch_to_atomicdata_list()
+    batch_ = atomicdata_list_to_batch(atomicdata_list)
